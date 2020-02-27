@@ -32,6 +32,7 @@
 
 #include <android/log.h>
 #include <sys/system_properties.h>
+#include <linux/limits.h>
 
 #define TAG "NetGuard.JNI"
 
@@ -303,6 +304,31 @@ typedef struct dns_rr {
     __be16 rdlength;
 } __packed dns_rr;
 
+// HTTP stuff
+
+/* The number goes to early days of IE which was able to handle 2083 bytes.
+ Anyway for limitation purposes it's even too much. */
+#define HTTP_URL_LENGTH_MAX                        2048
+#define HTTP_CONTENT_TYPE_LENGTH_MAX               129     //rfc6838#section-4.2
+
+/* Simple HTTP filter
+ *
+ * @Params
+ *
+ *  @{in} const struct arguments *args       - Context
+ *  @{in} const uint8_t *data                - TCP/UDP payload
+ *  @{in} uint16_t datalen                   - TCP/UDP payload length
+
+ *
+ *  @{return} true   - process traffic
+ *            false  - dismiss traffic
+ *
+ *  @Brief ...
+ */
+uint8_t httpFilter(const struct arguments *args, const uint8_t *data, uint16_t datalen);
+
+// END HTTP stuff
+
 // DHCP
 
 #define DHCP_OPTION_MAGIC_NUMBER (0x63825363)
@@ -519,6 +545,10 @@ jint get_uid_q(const struct arguments *args,
                jint dport);
 
 struct allowed *is_address_allowed(const struct arguments *args, jobject objPacket);
+
+jboolean is_url_path_blocked(const struct arguments *args, const char *urlPath);
+
+jboolean is_content_type_blocked(const struct arguments *args, const char *ct);
 
 jobject create_packet(const struct arguments *args,
                       jint version,

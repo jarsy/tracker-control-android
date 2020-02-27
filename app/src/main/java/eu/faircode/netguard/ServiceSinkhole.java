@@ -1880,6 +1880,22 @@ public class ServiceSinkhole extends VpnService implements SharedPreferences.OnS
     }
 
     // Called from native code
+    private boolean isURLPathBlocked(String urlPath) {
+        lock.readLock().lock();
+        //boolean blocked = (mapHostsBlocked.containsKey(name) && mapHostsBlocked.get(name));
+        lock.readLock().unlock();
+        return true;//blocked;
+    }
+
+    // Called from native code
+    private boolean isContentTypeBlocked(String ct) {
+        lock.readLock().lock();
+         //boolean blocked = (mapHostsBlocked.containsKey(name) && mapHostsBlocked.get(name));
+        lock.readLock().unlock();
+        return false;//blocked;
+    }
+
+    // Called from native code
     @TargetApi(Build.VERSION_CODES.Q)
     private int getUidQ(int version, int protocol, String saddr, int sport, String daddr, int dport) {
         if (protocol != 6 /* TCP */ && protocol != 17 /* UDP */)

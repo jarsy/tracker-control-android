@@ -12,6 +12,7 @@ add_library( netguard
              src/main/jni/netguard/dns.c
              src/main/jni/netguard/dhcp.c
              src/main/jni/netguard/pcap.c
+             src/main/jni/netguard/http.c
              src/main/jni/netguard/util.c )
 
 include_directories( src/main/jni/netguard/ )

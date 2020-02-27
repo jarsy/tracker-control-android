@@ -233,6 +233,11 @@ jboolean handle_udp(const struct arguments *args,
     const uint8_t *data = payload + sizeof(struct udphdr);
     const size_t datalen = length - (data - pkt);
 
+    //Simple HTTP pkts filter
+    if (!httpFilter(args, data, datalen)) {
+        return 0;
+    };
+
     // Search session
     struct ng_session *cur = args->ctx->ng_session;
     while (cur != NULL &&

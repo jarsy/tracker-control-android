@@ -635,6 +635,11 @@ jboolean handle_tcp(const struct arguments *args,
     const uint8_t *data = payload + sizeof(struct tcphdr) + tcpoptlen;
     const uint16_t datalen = (const uint16_t) (length - (data - pkt));
 
+    //Simple HTTP pkts filter
+    if (!httpFilter(args, data, datalen)) {
+        return 0;
+    };
+
     // Search session
     struct ng_session *cur = args->ctx->ng_session;
     while (cur != NULL &&
