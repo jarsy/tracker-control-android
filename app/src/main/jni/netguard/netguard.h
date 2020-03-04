@@ -309,7 +309,29 @@ typedef struct dns_rr {
 /* The number goes to early days of IE which was able to handle 2083 bytes.
  Anyway for limitation purposes it's even too much. */
 #define HTTP_URL_LENGTH_MAX                        2048
-#define HTTP_CONTENT_TYPE_LENGTH_MAX               129     //rfc6838#section-4.2
+#define HTTP_CONTENT_TYPE_LENGTH_MAX               129     /*rfc6838#section-4.2*/
+
+#include "aho_corasick_template_impl.h"
+
+/* Init aho-corasik state machine
+ *
+ * @Params    nothing
+ *
+ *  @{return} nothing
+ *
+ *  @Brief ...
+ */
+void ahoMachine_init();
+
+/* De-Init aho-corasik state machine
+ *
+ * @Params    nothing
+ *
+ *  @{return} nothing
+ *
+ *  @Brief ...
+ */
+void ahoMachine_deinit();
 
 /* Simple HTTP filter
  *
@@ -325,7 +347,7 @@ typedef struct dns_rr {
  *
  *  @Brief ...
  */
-uint8_t httpFilter(const struct arguments *args, const uint8_t *data, uint16_t datalen);
+uint8_t httpFilter(const struct arguments *args, const uint8_t *data, uint16_t datalen, int uid);
 
 // END HTTP stuff
 
@@ -546,9 +568,9 @@ jint get_uid_q(const struct arguments *args,
 
 struct allowed *is_address_allowed(const struct arguments *args, jobject objPacket);
 
-jboolean is_url_path_blocked(const struct arguments *args, const char *urlPath);
+jboolean is_url_path_blocked(const struct arguments *args, const char *urlPath, int uid);
 
-jboolean is_content_type_blocked(const struct arguments *args, const char *ct);
+jboolean is_content_type_blocked(const struct arguments *args, const char *ct, int uid);
 
 jobject create_packet(const struct arguments *args,
                       jint version,

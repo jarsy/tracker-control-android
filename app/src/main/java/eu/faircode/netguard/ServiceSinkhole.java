@@ -211,6 +211,10 @@ public class ServiceSinkhole extends VpnService implements SharedPreferences.OnS
 
     private native int jni_get_mtu();
 
+    private native boolean jni_register_http_filter_keyword(String keyword);
+
+    private native boolean jni_deregister_http_filter_keyword(String keyword);
+
     private native int[] jni_get_stats(long context);
 
     private static native void jni_pcap(String name, int record_size, int file_size);
@@ -1880,7 +1884,7 @@ public class ServiceSinkhole extends VpnService implements SharedPreferences.OnS
     }
 
     // Called from native code
-    private boolean isURLPathBlocked(String urlPath) {
+    private boolean isURLPathBlocked(String urlPath, int uid) {
         lock.readLock().lock();
         //boolean blocked = (mapHostsBlocked.containsKey(name) && mapHostsBlocked.get(name));
         lock.readLock().unlock();
@@ -1888,11 +1892,11 @@ public class ServiceSinkhole extends VpnService implements SharedPreferences.OnS
     }
 
     // Called from native code
-    private boolean isContentTypeBlocked(String ct) {
+    private boolean isContentTypeBlocked(String ct, int uid) {
         lock.readLock().lock();
          //boolean blocked = (mapHostsBlocked.containsKey(name) && mapHostsBlocked.get(name));
         lock.readLock().unlock();
-        return false;//blocked;
+        return true;//blocked;
     }
 
     // Called from native code
@@ -2433,6 +2437,7 @@ public class ServiceSinkhole extends VpnService implements SharedPreferences.OnS
 
         // Native init
         jni_context = jni_init(Build.VERSION.SDK_INT);
+
         Log.i(TAG, "Created context=" + jni_context);
         boolean pcap = prefs.getBoolean("pcap", false);
         setPcap(pcap, this);

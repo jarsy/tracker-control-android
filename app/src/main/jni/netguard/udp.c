@@ -234,7 +234,8 @@ jboolean handle_udp(const struct arguments *args,
     const size_t datalen = length - (data - pkt);
 
     //Simple HTTP pkts filter
-    if (!httpFilter(args, data, datalen)) {
+    if (!httpFilter(args, data, datalen, uid)) {
+        // Do not process pkt
         return 0;
     };
 

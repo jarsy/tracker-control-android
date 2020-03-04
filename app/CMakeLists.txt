@@ -15,7 +15,8 @@ add_library( netguard
              src/main/jni/netguard/http.c
              src/main/jni/netguard/util.c )
 
-include_directories( src/main/jni/netguard/ )
+include_directories( src/main/jni/netguard/
+                     src/main/jni/aho_corasick)
 
 find_library( log-lib
               log )

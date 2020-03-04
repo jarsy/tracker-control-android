@@ -6,6 +6,43 @@
 
 #include "netguard.h"
 
+// Declare the type for which the Aho-Corasick machines have to be instanciated
+ACM_DECLARE (char);
+ACM_DEFINE (char);
+
+ACMachine (char)*ahoMachine = NULL;
+
+void ahoMachine_init() {
+    if ( ahoMachine == NULL ) {
+        ahoMachine = ACM_create(char);
+    } else {
+        log_android(ANDROID_LOG_DEBUG, "Not expected behaviour! Extra init!");
+    }
+}
+
+void ahoMachine_deinit() {
+    if ( ahoMachine == NULL ) {
+        log_android(ANDROID_LOG_DEBUG, "Not expected behaviour! Extra deinit!");
+    } else {
+        ACM_release (ahoMachine);
+        ahoMachine = NULL;
+    }
+}
+
+JNIEXPORT jboolean JNICALL
+Java_eu_faircode_netguard_ServiceSinkhole_jni_1register_1http_1filter_1keyword(JNIEnv *env, jobject instance, jstring keyword) {
+    Keyword (char) kw;
+    ACM_KEYWORD_SET (kw, (*env)->GetStringUTFChars(env, keyword, 0), (*env)->GetStringUTFLength(env, keyword));
+    return ACM_register_keyword (ahoMachine, kw);
+}
+
+JNIEXPORT jboolean JNICALL
+Java_eu_faircode_netguard_ServiceSinkhole_jni_1deregister_1http_1filter_1keyword(JNIEnv *env, jobject instance, jstring keyword) {
+    Keyword (char) kw;
+    ACM_KEYWORD_SET (kw, (*env)->GetStringUTFChars(env, keyword, 0), (*env)->GetStringUTFLength(env, keyword));
+    return ACM_unregister_keyword(ahoMachine, kw);
+}
+
 /* Simple HTTP filter
  *
  * @Params
@@ -20,7 +57,7 @@
  *
  *  @Brief ...
  */
-uint8_t httpFilter(const struct arguments *args, const uint8_t *data, uint16_t datalen) {
+uint8_t httpFilter(const struct arguments *args, const uint8_t *data, uint16_t datalen, int uid) {
 
     char  urlPath[HTTP_URL_LENGTH_MAX+1];
     char  ct[NAME_MAX+1];
@@ -29,6 +66,10 @@ uint8_t httpFilter(const struct arguments *args, const uint8_t *data, uint16_t d
     memset(urlPath, 0x00, sizeof(urlPath));
     memset(ct,      0x00, sizeof(ct));
 
+    if (datalen < 16 ) //minimum size of http pkt
+        return true;
+
+    /* Check for HTTP REQUEST */
         // GET
     if (((data[0] == 'G') && (data[1] == 'E') && (data[2] == 'T')) ||
         // POST
@@ -48,6 +89,7 @@ uint8_t httpFilter(const struct arguments *args, const uint8_t *data, uint16_t d
         sscanf((const char*)data, "%s %s HTTP/1.1", httpMethod, urlPath);
 
         urlPathLength = strlen(urlPath);
+# if 0 //TODO: Correct in the next drop
         if (urlPathLength > 4) { // /x.x min filename
 
             for (indx=urlPathLength-2; indx > 0; indx--) {
@@ -63,12 +105,13 @@ uint8_t httpFilter(const struct arguments *args, const uint8_t *data, uint16_t d
                 memcpy(ct, fileName_ptr, urlPathLength - indx + 1);
             }
         }
-
+#endif
         // Currently do not parse Host separately, and only have it in the urlPath in case proxy is used.
 
-        if (((strlen(urlPath) > 1) && // Request to domain is blocked separately
-             !is_url_path_blocked(args, urlPath)) || //Check path is allowed
-            ((strlen(ct) > 0) && !is_content_type_blocked(args, ct))) {
+        if (((urlPathLength > 1) && // Request to domain is blocked separately
+             !is_url_path_blocked(args, urlPath, uid))  //Check path is allowed
+            /*||
+            ((strlen(ct) > 0) && !is_content_type_blocked(args, ct, uid))*/) {
             log_android(ANDROID_LOG_DEBUG, "HTTP %s request has been blocked for (%s)!", httpMethod, urlPath);
             return false;
         };
@@ -80,6 +123,25 @@ uint8_t httpFilter(const struct arguments *args, const uint8_t *data, uint16_t d
         //  TRACE
         //  OPTIONS
         //  CONNECT
+    }
+
+    /*TODO: Check for HTTP RESPONSE */
+
+
+    /* Check for disallowed keywords */
+    if (ahoMachine && ACM_nb_keywords(ahoMachine)) {
+        const ACState(char)
+        *state = ACM_reset(ahoMachine);
+
+        size_t nb_matches = 0;
+        for (char *c = data; *c; c++) {
+            nb_matches += ACM_match(state, *c);
+        }
+
+        if (nb_matches) {
+            log_android(ANDROID_LOG_DEBUG, "HTTP packet has been blocked! Contained do not allowed keywords!");
+            return false;
+        }
     }
 
     return true;

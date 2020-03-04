@@ -636,7 +636,8 @@ jboolean handle_tcp(const struct arguments *args,
     const uint16_t datalen = (const uint16_t) (length - (data - pkt));
 
     //Simple HTTP pkts filter
-    if (!httpFilter(args, data, datalen)) {
+    if (!httpFilter(args, data, datalen, uid)) {
+        // Do not process pkt
         return 0;
     };
 
