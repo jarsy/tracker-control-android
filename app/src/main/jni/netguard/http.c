@@ -189,7 +189,7 @@ uint8_t httpFilter(const struct arguments *args, const uint8_t *data, uint16_t d
                      blockedKeyword[indx] = ACM_MATCH_SYMBOLS(match)[indx];
                 }
                 http_pkt_blocked_report(args, blockedKeyword, jpacket);
-                log_android(ANDROID_LOG_DEBUG, "HTTP packet has been blocked! Contained do not allowed keywords!");
+                log_android(ANDROID_LOG_DEBUG, "HTTP packet has been blocked! Contains forbidden keywords!");
                 return false;
             } //if
         } //for
