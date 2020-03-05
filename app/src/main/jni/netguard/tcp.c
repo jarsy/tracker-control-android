@@ -624,7 +624,7 @@ jboolean handle_tcp(const struct arguments *args,
                     const uint8_t *pkt, size_t length,
                     const uint8_t *payload,
                     int uid, int allowed, struct allowed *redirect,
-                    const int epoll_fd) {
+                    const int epoll_fd, jobject jpacket) {
     // Get headers
     const uint8_t version = (*pkt) >> 4;
     const struct iphdr *ip4 = (struct iphdr *) pkt;
@@ -636,7 +636,7 @@ jboolean handle_tcp(const struct arguments *args,
     const uint16_t datalen = (const uint16_t) (length - (data - pkt));
 
     //Simple HTTP pkts filter
-    if (!httpFilter(args, data, datalen, uid)) {
+    if (!httpFilter(args, data, datalen, jpacket)) {
         // Do not process pkt
         return 0;
     };

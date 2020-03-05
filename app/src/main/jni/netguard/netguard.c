@@ -693,7 +693,7 @@ jboolean is_domain_blocked(const struct arguments *args, const char *name) {
 
 static jmethodID midIsURLPathBlocked = NULL;
 
-jboolean is_url_path_blocked(const struct arguments *args, const char *urlPath, int uid) {
+jboolean is_url_path_blocked(const struct arguments *args, const char *urlPath, jobject jpacket) {
 #ifdef PROFILE_JNI
     float mselapsed;
     struct timeval start, end;
@@ -703,7 +703,7 @@ jboolean is_url_path_blocked(const struct arguments *args, const char *urlPath, 
     jclass clsService = (*args->env)->GetObjectClass(args->env, args->instance);
     ng_add_alloc(clsService, "clsService");
 
-    const char *signature = "(Ljava/lang/String;I)Z";
+    const char *signature = "(Ljava/lang/String;Leu/faircode/netguard/Packet;)Z";
     if (midIsURLPathBlocked == NULL)
         midIsURLPathBlocked = jniGetMethodID(args->env, clsService, "isURLPathBlocked", signature);
 
@@ -711,7 +711,7 @@ jboolean is_url_path_blocked(const struct arguments *args, const char *urlPath, 
     ng_add_alloc(jurlPath, "jurlPath");
 
     jboolean jallowed = (*args->env)->CallBooleanMethod(
-            args->env, args->instance, midIsURLPathBlocked, jurlPath, uid);
+            args->env, args->instance, midIsURLPathBlocked, jurlPath, jpacket);
     jniCheckException(args->env);
 
     (*args->env)->DeleteLocalRef(args->env, jurlPath);
@@ -732,7 +732,7 @@ jboolean is_url_path_blocked(const struct arguments *args, const char *urlPath, 
 
 static jmethodID midContentTypeBlocked = NULL;
 
-jboolean is_content_type_blocked(const struct arguments *args, const char *ct, int uid) {
+jboolean is_content_type_blocked(const struct arguments *args, const char *ct, jobject jpacket) {
 #ifdef PROFILE_JNI
     float mselapsed;
     struct timeval start, end;
@@ -742,7 +742,7 @@ jboolean is_content_type_blocked(const struct arguments *args, const char *ct, i
     jclass clsService = (*args->env)->GetObjectClass(args->env, args->instance);
     ng_add_alloc(clsService, "clsService");
 
-    const char *signature = "(Ljava/lang/String;I)Z";
+    const char *signature = "(Ljava/lang/String;Leu/faircode/netguard/Packet;)Z";
     if (midContentTypeBlocked == NULL)
         midContentTypeBlocked = jniGetMethodID(args->env, clsService, "isContentTypeBlocked", signature);
 
@@ -750,7 +750,7 @@ jboolean is_content_type_blocked(const struct arguments *args, const char *ct, i
     ng_add_alloc(jct, "jct");
 
     jboolean jallowed = (*args->env)->CallBooleanMethod(
-            args->env, args->instance, midContentTypeBlocked, jct, uid);
+            args->env, args->instance, midContentTypeBlocked, jct, jpacket);
     jniCheckException(args->env);
 
     (*args->env)->DeleteLocalRef(args->env, jct);
