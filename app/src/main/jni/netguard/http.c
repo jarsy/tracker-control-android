@@ -130,29 +130,10 @@ uint8_t httpFilter(const struct arguments *args, const uint8_t *data, uint16_t d
         sscanf((const char*)data, "%s %s HTTP/1.1", httpMethod, urlPath);
 
         urlPathLength = strlen(urlPath);
-# if 0 //TODO: Correct in the next drop
-        if (urlPathLength > 4) { // /x.x min filename
-
-            for (indx=urlPathLength-2; indx > 0; indx--) {
-                if (urlPath[indx] == '.') { //At the point check for files with extention.
-                    filePresent_ptr = &urlPath[indx];
-                } else if (urlPath[indx] == '/') {
-                    fileName_ptr = &urlPath[indx + 1];
-                    break;
-                }
-            }
-
-            if (fileName_ptr < filePresent_ptr) {
-                memcpy(ct, fileName_ptr, urlPathLength - indx + 1);
-            }
-        }
-#endif
         // Currently do not parse Host separately, and only have it in the urlPath in case proxy is used.
-
         if (((urlPathLength > 1) && // Request to domain is blocked separately
-             !is_url_path_blocked(args, urlPath, jpacket))  //Check path is allowed
-            /*||
-            ((strlen(ct) > 0) && !is_content_type_blocked(args, ct, uid))*/) {
+             is_url_path_blocked(args, urlPath, jpacket))) { //Check path is allowed
+
             log_android(ANDROID_LOG_DEBUG, "HTTP %s request has been blocked for (%s)!", httpMethod, urlPath);
             return false;
         };
