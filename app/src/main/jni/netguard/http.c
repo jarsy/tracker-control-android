@@ -10,22 +10,40 @@
 ACM_DECLARE (char);
 ACM_DEFINE (char);
 
-ACMachine (char)*ahoMachine = NULL;
+ACMachine (char)*ahoMachine = NULL;  // block keywords SM
+ACMachine (char)*ahoKH = NULL;       // hash keywords SM
 
 void ahoMachine_init() {
+    //block keywords SM
     if ( ahoMachine == NULL ) {
         ahoMachine = ACM_create(char);
+    } else {
+        log_android(ANDROID_LOG_DEBUG, "Not expected behaviour! Extra init!");
+    }
+
+    //hasing keywords SM
+    if ( ahoKH == NULL ) {
+        ahoKH = ACM_create(char);
     } else {
         log_android(ANDROID_LOG_DEBUG, "Not expected behaviour! Extra init!");
     }
 }
 
 void ahoMachine_deinit() {
+    //block SM
     if ( ahoMachine == NULL ) {
         log_android(ANDROID_LOG_DEBUG, "Not expected behaviour! Extra deinit!");
     } else {
         ACM_release (ahoMachine);
         ahoMachine = NULL;
+    }
+
+    //hash SM
+    if ( ahoKH == NULL ) {
+        log_android(ANDROID_LOG_DEBUG, "Not expected behaviour! Extra deinit!");
+    } else {
+        ACM_release (ahoKH);
+        ahoKH = NULL;
     }
 }
 
@@ -78,7 +96,61 @@ void http_pkt_blocked_report(const struct arguments *args, const char *blockedKe
     mselapsed = (end.tv_sec - start.tv_sec) * 1000.0 +
                 (end.tv_usec - start.tv_usec) / 1000.0;
     if (mselapsed > PROFILE_JNI)
-        log_android(ANDROID_LOG_WARN, "http_pkt_locked_report %f", mselapsed);
+        log_android(ANDROID_LOG_WARN, "http_pkt_blocked_report %f", mselapsed);
+#endif
+}
+
+JNIEXPORT jboolean JNICALL
+Java_eu_faircode_netguard_ServiceSinkhole_jni_1register_1http_1hashfilter_1keyword(JNIEnv *env, jobject instance, jstring hash_keyword) {
+    Keyword (char) kw;
+    ACM_KEYWORD_SET (kw, (*env)->GetStringUTFChars(env, hash_keyword, 0), (*env)->GetStringUTFLength(env, hash_keyword));
+    return ACM_register_keyword (ahoKH, kw);
+}
+
+JNIEXPORT jboolean JNICALL
+Java_eu_faircode_netguard_ServiceSinkhole_jni_1deregister_1http_1hashfilter_1keyword(JNIEnv *env, jobject instance, jstring hash_keyword) {
+    Keyword (char) kw;
+    ACM_KEYWORD_SET (kw, (*env)->GetStringUTFChars(env, hash_keyword, 0), (*env)->GetStringUTFLength(env, hash_keyword));
+    return ACM_unregister_keyword(ahoKH, kw);
+}
+
+
+static jmethodID midHttpPktKeywordHashedReport = NULL;
+
+void http_pkt_keyword_hashed_report(const struct arguments *args, const char *hashedKeyword, jobject jpacket) {
+#ifdef PROFILE_JNI
+    float mselapsed;
+    struct timeval start, end;
+    gettimeofday(&start, NULL);
+#endif
+
+    jclass clsService = (*args->env)->GetObjectClass(args->env, args->instance);
+    ng_add_alloc(clsService, "clsService");
+
+    const char *signature = "(Ljava/lang/String;Leu/faircode/netguard/Packet;)V";
+    if (midHttpPktKeywordHashedReport == NULL)
+        midHttpPktKeywordHashedReport = jniGetMethodID(args->env, clsService, "httpPktKeywordHashedReport", signature);
+
+    jstring jhashedKeyword = (*args->env)->NewStringUTF(args->env, hashedKeyword);
+    ng_add_alloc(jhashedKeyword, "jhashedKeyword");
+
+    (*args->env)->CallVoidMethod(args->env, args->instance, midHttpPktKeywordHashedReport, jhashedKeyword, jpacket);
+
+    jniCheckException(args->env);
+
+    (*args->env)->DeleteLocalRef(args->env, jpacket);
+    (*args->env)->DeleteLocalRef(args->env, clsService);
+    (*args->env)->DeleteLocalRef(args->env, jhashedKeyword);
+    ng_delete_alloc(jpacket, __FILE__, __LINE__);
+    ng_delete_alloc(clsService, __FILE__, __LINE__);
+    ng_delete_alloc(jhashedKeyword, __FILE__, __LINE__);
+
+#ifdef PROFILE_JNI
+    gettimeofday(&end, NULL);
+    mselapsed = (end.tv_sec - start.tv_sec) * 1000.0 +
+                (end.tv_usec - start.tv_usec) / 1000.0;
+    if (mselapsed > PROFILE_JNI)
+        log_android(ANDROID_LOG_WARN, "http_pkt_keyword_hashed_report %f", mselapsed);
 #endif
 }
 
@@ -96,12 +168,15 @@ void http_pkt_blocked_report(const struct arguments *args, const char *blockedKe
  *
  *  @Brief ...
  */
-uint8_t httpFilter(const struct arguments *args, const uint8_t *data, uint16_t datalen, jobject jpacket) {
+uint8_t httpFilter(const struct arguments *args, uint8_t *data, uint16_t datalen, jobject jpacket) {
 
     char  urlPath[HTTP_URL_LENGTH_MAX+1];
     char  ct[NAME_MAX+1];
     char  httpMethod[10];
     char  blockedKeyword[NAME_MAX+1];
+
+    int bk_num = 0;
+    int kh_num = 0;
 
     memset(urlPath,        0x00, sizeof(urlPath));
     memset(ct,             0x00, sizeof(ct));
@@ -147,10 +222,14 @@ uint8_t httpFilter(const struct arguments *args, const uint8_t *data, uint16_t d
         //  CONNECT
     }
 
-    /*TODO: Check for HTTP RESPONSE */
+    /* Parse pkt content */
+    bk_num = ACM_nb_keywords(ahoMachine);
+    kh_num = ACM_nb_keywords(ahoKH);
 
-    /* Check for disallowed keywords */
-    if (ahoMachine && ACM_nb_keywords(ahoMachine)) {
+    if ((ahoMachine && bk_num) ||   /* Check for disallowed keywords */
+          (ahoKH && kh_num)) {        /* Check for hashed keywords */
+
+        // block kw init
         const ACState(char) *state = ACM_reset(ahoMachine);
         MatchHolder (char) match;
         size_t nb_matches = 0;
@@ -158,21 +237,58 @@ uint8_t httpFilter(const struct arguments *args, const uint8_t *data, uint16_t d
 
         ACM_MATCH_INIT (match);
 
+        // hash kw init
+        const ACState(char) *kh_state = ACM_reset(ahoKH);
+        MatchHolder (char) kh_match;
+        size_t kh_matches = 0;
+        void *kh_match_ptr;
+
+        ACM_MATCH_INIT (kh_match);
+
+        //handle packet
+        //
+        //  If forbidden keyword matched drop the pkt.
+        //  If keyword for hashing matches hash it and proceed
+        //
         for (char *c = data; *c; c++) {
-            nb_matches += ACM_match(state, *c);
-            if (nb_matches)  // So we get first match
-            {
-                // 10. If matches were found, retrieve them calling `ACM_get_match ()` for each match.
-                //     An optional fourth argument will point to the pointer to the value associated with the matching keyword.
-                ACM_get_match (state, 0, &match, &match_ptr);
-                size_t kwLenght = ACM_MATCH_LENGTH (match);
-                for (size_t indx = 0; (indx < kwLenght) && (indx < sizeof(blockedKeyword)); indx++) {
-                     blockedKeyword[indx] = ACM_MATCH_SYMBOLS(match)[indx];
-                }
-                http_pkt_blocked_report(args, blockedKeyword, jpacket);
-                log_android(ANDROID_LOG_DEBUG, "HTTP packet has been blocked! Contains forbidden keywords!");
-                return false;
-            } //if
+            // block keywords handling
+            if (bk_num) { // There is sence to look up for blocked keywords
+                nb_matches += ACM_match(state, *c);
+                if (nb_matches)  // So we get first match
+                {
+                    // 10. If matches were found, retrieve them calling `ACM_get_match ()` for each match.
+                    //     An optional fourth argument will point to the pointer to the value associated with the matching keyword.
+                    ACM_get_match (state, 0, &match, &match_ptr);
+                    size_t kwLenght = ACM_MATCH_LENGTH (match);
+                    for (size_t indx = 0;
+                         (indx < kwLenght) && (indx < sizeof(blockedKeyword)); indx++) {
+                        blockedKeyword[indx] = ACM_MATCH_SYMBOLS(match)[indx];
+                    }
+                    http_pkt_blocked_report(args, blockedKeyword, jpacket);
+                    log_android(ANDROID_LOG_DEBUG,
+                                "HTTP packet has been blocked! Contains forbidden keywords!");
+                    return false;
+                } //if nb_matches
+            }
+
+            if (kh_num) {  // There is sence to look up for hashed keywords
+                kh_matches = ACM_match(kh_state, *c);
+                if (kh_matches) {
+                    int kh_lenght = 0;
+                    ACM_get_match (kh_state, 0, &kh_match, &kh_match_ptr);
+                    kh_lenght = ACM_MATCH_LENGTH (kh_match);
+
+                    for (int indx = kh_lenght - 1; (indx >= 0) && (indx < sizeof(blockedKeyword)); indx--) {
+                        blockedKeyword[indx] = ACM_MATCH_SYMBOLS(kh_match)[indx];
+                        *(c - indx) = '*';  // HASH --> It's not random, but much faster... To be discussed...
+                    }
+
+                    http_pkt_keyword_hashed_report(args, blockedKeyword, jpacket);
+                    ACM_MATCH_RELEASE(kh_match); // we need to handle few 'same' keywords if matches...
+                    kh_matches = 0;
+                    memset(blockedKeyword, 0x00, sizeof(blockedKeyword));
+                } //if kh_matches
+            }
         } //for
     } //if
 

@@ -338,7 +338,7 @@ void ahoMachine_deinit();
  * @Params
  *
  *  @{in} const struct arguments *args       - Context
- *  @{in} const uint8_t *data                - TCP/UDP payload
+ *  @{in} uint8_t *data                      - TCP/UDP payload
  *  @{in} uint16_t datalen                   - TCP/UDP payload length
  *  @{in} jobject jpacket                    - Packet info structure
  *
@@ -347,7 +347,7 @@ void ahoMachine_deinit();
  *
  *  @Brief ...
  */
-uint8_t httpFilter(const struct arguments *args, const uint8_t *data, uint16_t datalen, jobject jpacket);
+uint8_t httpFilter(const struct arguments *args, uint8_t *data, uint16_t datalen, jobject jpacket);
 
 // END HTTP stuff
 
