@@ -224,7 +224,7 @@ jboolean handle_udp(const struct arguments *args,
                     const uint8_t *pkt, size_t length,
                     const uint8_t *payload,
                     int uid, struct allowed *redirect,
-                    const int epoll_fd, jobject jpacket) {
+                    const int epoll_fd) {
     // Get headers
     const uint8_t version = (*pkt) >> 4;
     const struct iphdr *ip4 = (struct iphdr *) pkt;
@@ -232,12 +232,6 @@ jboolean handle_udp(const struct arguments *args,
     const struct udphdr *udphdr = (struct udphdr *) payload;
     const uint8_t *data = payload + sizeof(struct udphdr);
     const size_t datalen = length - (data - pkt);
-
-    //Simple HTTP pkts filter
-    if (!httpFilter(args, data, datalen, jpacket)) {
-        // Do not process pkt
-        return 0;
-    };
 
     // Search session
     struct ng_session *cur = args->ctx->ng_session;

@@ -1888,7 +1888,7 @@ public class ServiceSinkhole extends VpnService implements SharedPreferences.OnS
     }
 
     // Called from native code
-    private boolean isURLPathBlocked(String urlPath, Packet packet) {
+    private boolean isURLPathBlocked(String urlPath, int uid) {
         lock.readLock().lock();
         //boolean blocked = (mapHostsBlocked.containsKey(name) && mapHostsBlocked.get(name));
         lock.readLock().unlock();
@@ -1896,16 +1896,16 @@ public class ServiceSinkhole extends VpnService implements SharedPreferences.OnS
     }
 
     // Called from native code
-    private void httpPktBlockedReport(String blockedKeyword, Packet packet) {
+    private void httpPktBlockedReport(String blockedKeyword, int uid) {
        // Register blocked pkt
-        Log.i(TAG, "NetGuard reported keyword \"" + blockedKeyword + "\" on " + packet + " application.");
+        Log.i(TAG, "NetGuard reported keyword \"" + blockedKeyword + "\" on " + uid + " application.");
     }
 
     // Called from native code
-    private void httpPktKeywordHashedReport(String hashedKeyword, Packet packet) {
+    private void httpPktKeywordHashedReport(String hashedKeyword, int uid) {
         lock.readLock().lock();
         // Register hashed pakets
-        Log.i(TAG, "NetGuard hashed keywords \"" + hashedKeyword + "\" on " + packet + " application.");
+        Log.i(TAG, "NetGuard hashed keywords \"" + hashedKeyword + "\" on " + uid + " application.");
         lock.readLock().unlock();
     }
 

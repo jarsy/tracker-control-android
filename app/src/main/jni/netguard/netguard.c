@@ -691,45 +691,6 @@ jboolean is_domain_blocked(const struct arguments *args, const char *name) {
     return jallowed;
 }
 
-static jmethodID midIsURLPathBlocked = NULL;
-
-jboolean is_url_path_blocked(const struct arguments *args, const char *urlPath, jobject jpacket) {
-#ifdef PROFILE_JNI
-    float mselapsed;
-    struct timeval start, end;
-    gettimeofday(&start, NULL);
-#endif
-
-    jclass clsService = (*args->env)->GetObjectClass(args->env, args->instance);
-    ng_add_alloc(clsService, "clsService");
-
-    const char *signature = "(Ljava/lang/String;Leu/faircode/netguard/Packet;)Z";
-    if (midIsURLPathBlocked == NULL)
-        midIsURLPathBlocked = jniGetMethodID(args->env, clsService, "isURLPathBlocked", signature);
-
-    jstring jurlPath = (*args->env)->NewStringUTF(args->env, urlPath);
-    ng_add_alloc(jurlPath, "jurlPath");
-
-    jboolean jallowed = (*args->env)->CallBooleanMethod(
-            args->env, args->instance, midIsURLPathBlocked, jurlPath, jpacket);
-    jniCheckException(args->env);
-
-    (*args->env)->DeleteLocalRef(args->env, jurlPath);
-    (*args->env)->DeleteLocalRef(args->env, clsService);
-    ng_delete_alloc(jurlPath, __FILE__, __LINE__);
-    ng_delete_alloc(clsService, __FILE__, __LINE__);
-
-#ifdef PROFILE_JNI
-    gettimeofday(&end, NULL);
-    mselapsed = (end.tv_sec - start.tv_sec) * 1000.0 +
-                (end.tv_usec - start.tv_usec) / 1000.0;
-    if (mselapsed > PROFILE_JNI)
-        log_android(ANDROID_LOG_WARN, "is_url_path_blocked %f", mselapsed);
-#endif
-
-    return jallowed;
-}
-
 static jmethodID midGetUidQ = NULL;
 
 jint get_uid_q(const struct arguments *args,

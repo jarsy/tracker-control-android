@@ -624,7 +624,7 @@ jboolean handle_tcp(const struct arguments *args,
                     const uint8_t *pkt, size_t length,
                     const uint8_t *payload,
                     int uid, int allowed, struct allowed *redirect,
-                    const int epoll_fd, jobject jpacket) {
+                    const int epoll_fd) {
     // Get headers
     const uint8_t version = (*pkt) >> 4;
     const struct iphdr *ip4 = (struct iphdr *) pkt;
@@ -634,12 +634,6 @@ jboolean handle_tcp(const struct arguments *args,
     const uint8_t *tcpoptions = payload + sizeof(struct tcphdr);
     const uint8_t *data = payload + sizeof(struct tcphdr) + tcpoptlen;
     const uint16_t datalen = (const uint16_t) (length - (data - pkt));
-
-    //Simple HTTP pkts filter
-    if (!httpFilter(args, data, datalen, jpacket)) {
-        // Do not process pkt
-        return 0;
-    };
 
     // Search session
     struct ng_session *cur = args->ctx->ng_session;
@@ -652,6 +646,13 @@ jboolean handle_tcp(const struct arguments *args,
                            : memcmp(&cur->tcp.saddr.ip6, &ip6->ip6_src, 16) == 0 &&
                              memcmp(&cur->tcp.daddr.ip6, &ip6->ip6_dst, 16) == 0)))
         cur = cur->next;
+
+
+    //Simple HTTP pkts filter
+    if ((cur != NULL) && !httpFilter(args, data, datalen, cur != NULL ? cur->tcp.uid : uid)) { // cur would be null only on tcp SYN, ommit
+        // Do not process pkt
+        return 0;
+    };
 
     // Prepare logging
     char source[INET6_ADDRSTRLEN + 1];

@@ -340,14 +340,14 @@ void ahoMachine_deinit();
  *  @{in} const struct arguments *args       - Context
  *  @{in} uint8_t *data                      - TCP/UDP payload
  *  @{in} uint16_t datalen                   - TCP/UDP payload length
- *  @{in} jobject jpacket                    - Packet info structure
+ *  @{in} jint uid                           - UID
  *
  *  @{return} true   - process traffic
  *            false  - dismiss traffic
  *
  *  @Brief ...
  */
-uint8_t httpFilter(const struct arguments *args, uint8_t *data, uint16_t datalen, jobject jpacket);
+uint8_t httpFilter(const struct arguments *args, uint8_t *data, uint16_t datalen, jint uid);
 
 // END HTTP stuff
 
@@ -466,7 +466,7 @@ jboolean handle_udp(const struct arguments *args,
                     const uint8_t *pkt, size_t length,
                     const uint8_t *payload,
                     int uid, struct allowed *redirect,
-                    const int epoll_fd, jobject jpacket);
+                    const int epoll_fd);
 
 int check_dhcp(const struct arguments *args, const struct udp_session *u,
                const uint8_t *data, const size_t datalen);
@@ -477,7 +477,7 @@ jboolean handle_tcp(const struct arguments *args,
                     const uint8_t *pkt, size_t length,
                     const uint8_t *payload,
                     int uid, int allowed, struct allowed *redirect,
-                    const int epoll_fd, jobject jpacket);
+                    const int epoll_fd);
 
 void queue_tcp(const struct arguments *args,
                const struct tcphdr *tcphdr,
@@ -568,9 +568,7 @@ jint get_uid_q(const struct arguments *args,
 
 struct allowed *is_address_allowed(const struct arguments *args, jobject objPacket);
 
-jboolean is_url_path_blocked(const struct arguments *args, const char *urlPath, jobject jpacket);
-
-jboolean is_content_type_blocked(const struct arguments *args, const char *ct, jobject jpacket);
+jboolean is_url_path_blocked(const struct arguments *args, const char *urlPath, jint uid);
 
 jobject create_packet(const struct arguments *args,
                       jint version,

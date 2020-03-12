@@ -40,9 +40,9 @@
     void logPacket(eu.faircode.netguard.Packet);
     void dnsResolved(eu.faircode.netguard.ResourceRecord);
     boolean isDomainBlocked(java.lang.String);
-    boolean isURLPathBlocked(java.lang.String, eu.faircode.netguard.Packet);
-    void httpPktBlockedReport(java.lang.String, eu.faircode.netguard.Packet);
-    void httpPktKeywordHashedReport(java.lang.String, eu.faircode.netguard.Packet);
+    boolean isURLPathBlocked(java.lang.String, int);
+    void httpPktBlockedReport(java.lang.String, int);
+    void httpPktKeywordHashedReport(java.lang.String, int);
     int getUidQ(int, int, java.lang.String, int, java.lang.String, int);
     eu.faircode.netguard.Allowed isAddressAllowed(eu.faircode.netguard.Packet);
     void accountUsage(eu.faircode.netguard.Usage);

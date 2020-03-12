@@ -316,16 +316,10 @@ void handle_ip(const struct arguments *args,
     if (allowed) {
         if (protocol == IPPROTO_ICMP || protocol == IPPROTO_ICMPV6)
             handle_icmp(args, pkt, length, payload, uid, epoll_fd);
-        else if (protocol == IPPROTO_UDP) {
-            jobject objPacket = create_packet(
-                    args, version, protocol, flags, source, sport, dest, dport, data, uid, 0);
-            handle_udp(args, pkt, length, payload, uid, redirect, epoll_fd, objPacket);
-        }
-        else if (protocol == IPPROTO_TCP) {
-            jobject objPacket = create_packet(
-                    args, version, protocol, flags, source, sport, dest, dport, data, uid, 0);
-            handle_tcp(args, pkt, length, payload, uid, allowed, redirect, epoll_fd, objPacket);
-        }
+        else if (protocol == IPPROTO_UDP)
+            handle_udp(args, pkt, length, payload, uid, redirect, epoll_fd);
+        else if (protocol == IPPROTO_TCP)
+            handle_tcp(args, pkt, length, payload, uid, allowed, redirect, epoll_fd);
     } else {
         if (protocol == IPPROTO_UDP)
             block_udp(args, pkt, length, payload, uid);

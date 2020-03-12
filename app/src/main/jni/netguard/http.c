@@ -63,7 +63,7 @@ Java_eu_faircode_netguard_ServiceSinkhole_jni_1deregister_1http_1filter_1keyword
 
 static jmethodID midHttpPktBlockedReport = NULL;
 
-void http_pkt_blocked_report(const struct arguments *args, const char *blockedKeyword, jobject jpacket) {
+void http_pkt_blocked_report(const struct arguments *args, const char *blockedKeyword, jint uid) {
 #ifdef PROFILE_JNI
     float mselapsed;
     struct timeval start, end;
@@ -73,21 +73,19 @@ void http_pkt_blocked_report(const struct arguments *args, const char *blockedKe
     jclass clsService = (*args->env)->GetObjectClass(args->env, args->instance);
     ng_add_alloc(clsService, "clsService");
 
-    const char *signature = "(Ljava/lang/String;Leu/faircode/netguard/Packet;)V";
+    const char *signature = "(Ljava/lang/String;I)V";
     if (midHttpPktBlockedReport == NULL)
         midHttpPktBlockedReport = jniGetMethodID(args->env, clsService, "httpPktBlockedReport", signature);
 
     jstring jblockedKeyword = (*args->env)->NewStringUTF(args->env, blockedKeyword);
     ng_add_alloc(jblockedKeyword, "jblockedKeyword");
 
-    (*args->env)->CallVoidMethod(args->env, args->instance, midHttpPktBlockedReport, jblockedKeyword, jpacket);
+    (*args->env)->CallVoidMethod(args->env, args->instance, midHttpPktBlockedReport, jblockedKeyword, uid);
 
     jniCheckException(args->env);
 
-    (*args->env)->DeleteLocalRef(args->env, jpacket);
     (*args->env)->DeleteLocalRef(args->env, clsService);
     (*args->env)->DeleteLocalRef(args->env, jblockedKeyword);
-    ng_delete_alloc(jpacket, __FILE__, __LINE__);
     ng_delete_alloc(clsService, __FILE__, __LINE__);
     ng_delete_alloc(jblockedKeyword, __FILE__, __LINE__);
 
@@ -114,10 +112,9 @@ Java_eu_faircode_netguard_ServiceSinkhole_jni_1deregister_1http_1hashfilter_1key
     return ACM_unregister_keyword(ahoKH, kw);
 }
 
-
 static jmethodID midHttpPktKeywordHashedReport = NULL;
 
-void http_pkt_keyword_hashed_report(const struct arguments *args, const char *hashedKeyword, jobject jpacket) {
+void http_pkt_keyword_hashed_report(const struct arguments *args, const char *hashedKeyword, jint uid) {
 #ifdef PROFILE_JNI
     float mselapsed;
     struct timeval start, end;
@@ -127,21 +124,19 @@ void http_pkt_keyword_hashed_report(const struct arguments *args, const char *ha
     jclass clsService = (*args->env)->GetObjectClass(args->env, args->instance);
     ng_add_alloc(clsService, "clsService");
 
-    const char *signature = "(Ljava/lang/String;Leu/faircode/netguard/Packet;)V";
+    const char *signature = "(Ljava/lang/String;I)V";
     if (midHttpPktKeywordHashedReport == NULL)
         midHttpPktKeywordHashedReport = jniGetMethodID(args->env, clsService, "httpPktKeywordHashedReport", signature);
 
     jstring jhashedKeyword = (*args->env)->NewStringUTF(args->env, hashedKeyword);
     ng_add_alloc(jhashedKeyword, "jhashedKeyword");
 
-    (*args->env)->CallVoidMethod(args->env, args->instance, midHttpPktKeywordHashedReport, jhashedKeyword, jpacket);
+    (*args->env)->CallVoidMethod(args->env, args->instance, midHttpPktKeywordHashedReport, jhashedKeyword, uid);
 
     jniCheckException(args->env);
 
-    (*args->env)->DeleteLocalRef(args->env, jpacket);
     (*args->env)->DeleteLocalRef(args->env, clsService);
     (*args->env)->DeleteLocalRef(args->env, jhashedKeyword);
-    ng_delete_alloc(jpacket, __FILE__, __LINE__);
     ng_delete_alloc(clsService, __FILE__, __LINE__);
     ng_delete_alloc(jhashedKeyword, __FILE__, __LINE__);
 
@@ -154,6 +149,45 @@ void http_pkt_keyword_hashed_report(const struct arguments *args, const char *ha
 #endif
 }
 
+static jmethodID midIsURLPathBlocked = NULL;
+
+jboolean is_url_path_blocked(const struct arguments *args, const char *urlPath, jint uid) {
+#ifdef PROFILE_JNI
+    float mselapsed;
+    struct timeval start, end;
+    gettimeofday(&start, NULL);
+#endif
+
+    jclass clsService = (*args->env)->GetObjectClass(args->env, args->instance);
+    ng_add_alloc(clsService, "clsService");
+
+    const char *signature = "(Ljava/lang/String;I)Z";
+    if (midIsURLPathBlocked == NULL)
+        midIsURLPathBlocked = jniGetMethodID(args->env, clsService, "isURLPathBlocked", signature);
+
+    jstring jurlPath = (*args->env)->NewStringUTF(args->env, urlPath);
+    ng_add_alloc(jurlPath, "jurlPath");
+
+    jboolean jallowed = (*args->env)->CallBooleanMethod(
+            args->env, args->instance, midIsURLPathBlocked, jurlPath, uid);
+    jniCheckException(args->env);
+
+    (*args->env)->DeleteLocalRef(args->env, jurlPath);
+    (*args->env)->DeleteLocalRef(args->env, clsService);
+    ng_delete_alloc(jurlPath, __FILE__, __LINE__);
+    ng_delete_alloc(clsService, __FILE__, __LINE__);
+
+#ifdef PROFILE_JNI
+    gettimeofday(&end, NULL);
+    mselapsed = (end.tv_sec - start.tv_sec) * 1000.0 +
+                (end.tv_usec - start.tv_usec) / 1000.0;
+    if (mselapsed > PROFILE_JNI)
+        log_android(ANDROID_LOG_WARN, "is_url_path_blocked %f", mselapsed);
+#endif
+
+    return jallowed;
+}
+
 /* Simple HTTP filter
  *
  * @Params
@@ -161,14 +195,14 @@ void http_pkt_keyword_hashed_report(const struct arguments *args, const char *ha
  *  @{in} const struct arguments *args       - Context
  *  @{in} const uint8_t *data                - TCP/UDP payload
  *  @{in} uint16_t datalen                   - TCP/UDP payload length
- *  @{in} jobject jpacket                    - Packet info structure
+ *  @{in} jint uid                           - UID
  *
  *  @{return} true   - process traffic
  *            false  - dismiss traffic
  *
  *  @Brief ...
  */
-uint8_t httpFilter(const struct arguments *args, uint8_t *data, uint16_t datalen, jobject jpacket) {
+uint8_t httpFilter(const struct arguments *args, uint8_t *data, uint16_t datalen, jint uid) {
 
     char  urlPath[HTTP_URL_LENGTH_MAX+1];
     char  ct[NAME_MAX+1];
@@ -207,9 +241,9 @@ uint8_t httpFilter(const struct arguments *args, uint8_t *data, uint16_t datalen
         urlPathLength = strlen(urlPath);
         // Currently do not parse Host separately, and only have it in the urlPath in case proxy is used.
         if (((urlPathLength > 1) && // Request to domain is blocked separately
-             is_url_path_blocked(args, urlPath, jpacket))) { //Check path is allowed
+             is_url_path_blocked(args, urlPath, uid))) { //Check path is allowed
 
-            log_android(ANDROID_LOG_DEBUG, "HTTP %s request has been blocked for (%s)!", httpMethod, urlPath);
+            log_android(ANDROID_LOG_DEBUG, "HTTP %s request has been blocked for (%s), UID %d!", httpMethod, urlPath, uid);
             return false;
         };
 
@@ -245,7 +279,7 @@ uint8_t httpFilter(const struct arguments *args, uint8_t *data, uint16_t datalen
 
         ACM_MATCH_INIT (kh_match);
 
-        //handle packet
+        // handle packet
         //
         //  If forbidden keyword matched drop the pkt.
         //  If keyword for hashing matches hash it and proceed
@@ -264,7 +298,7 @@ uint8_t httpFilter(const struct arguments *args, uint8_t *data, uint16_t datalen
                          (indx < kwLenght) && (indx < sizeof(blockedKeyword)); indx++) {
                         blockedKeyword[indx] = ACM_MATCH_SYMBOLS(match)[indx];
                     }
-                    http_pkt_blocked_report(args, blockedKeyword, jpacket);
+                    http_pkt_blocked_report(args, blockedKeyword, uid);
                     log_android(ANDROID_LOG_DEBUG,
                                 "HTTP packet has been blocked! Contains forbidden keywords!");
                     return false;
@@ -283,7 +317,7 @@ uint8_t httpFilter(const struct arguments *args, uint8_t *data, uint16_t datalen
                         *(c - indx) = '*';  // HASH --> It's not random, but much faster... To be discussed...
                     }
 
-                    http_pkt_keyword_hashed_report(args, blockedKeyword, jpacket);
+                    http_pkt_keyword_hashed_report(args, blockedKeyword, uid);
                     ACM_MATCH_RELEASE(kh_match); // we need to handle few 'same' keywords if matches...
                     kh_matches = 0;
                     memset(blockedKeyword, 0x00, sizeof(blockedKeyword));
