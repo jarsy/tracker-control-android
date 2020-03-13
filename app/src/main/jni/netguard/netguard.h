@@ -349,6 +349,22 @@ void ahoMachine_deinit();
  */
 uint8_t httpFilter(const struct arguments *args, uint8_t *data, uint16_t datalen, jint uid);
 
+/* Simple content type filter
+ *
+ * @Params
+ *
+ *  @{in} const struct arguments *args       - Context
+ *  @{in} const uint8_t *data                - TCP payload
+ *  @{in} uint16_t datalen                   - TCP payload length
+ *  @{in} jint uid                           - UID
+ *
+ *  @{return} true   - process traffic
+ *            false  - dismiss traffic
+ *
+ *  @Brief ...
+ */
+uint8_t contentTypeFilter(const struct arguments *args, uint8_t *data, uint16_t datalen, jint uid);
+
 // END HTTP stuff
 
 // DHCP
@@ -569,6 +585,8 @@ jint get_uid_q(const struct arguments *args,
 struct allowed *is_address_allowed(const struct arguments *args, jobject objPacket);
 
 jboolean is_url_path_blocked(const struct arguments *args, const char *urlPath, jint uid);
+
+jboolean is_content_type_blocked(const struct arguments *args, const char *ct, jint uid);
 
 jobject create_packet(const struct arguments *args,
                       jint version,

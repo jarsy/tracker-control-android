@@ -6,12 +6,17 @@
 
 #include "netguard.h"
 
+/*
+ *  REQUEST handling
+ */
+
 // Declare the type for which the Aho-Corasick machines have to be instanciated
 ACM_DECLARE (char);
 ACM_DEFINE (char);
 
 ACMachine (char)*ahoMachine = NULL;  // block keywords SM
 ACMachine (char)*ahoKH = NULL;       // hash keywords SM
+ACMachine (char)*ahoCT = NULL;       // Content recognition
 
 void ahoMachine_init() {
     //block keywords SM
@@ -24,6 +29,26 @@ void ahoMachine_init() {
     //hasing keywords SM
     if ( ahoKH == NULL ) {
         ahoKH = ACM_create(char);
+    } else {
+        log_android(ANDROID_LOG_DEBUG, "Not expected behaviour! Extra init!");
+    }
+
+    //content recognition SM
+    if ( ahoCT == NULL ) {
+        ahoCT = ACM_create(char);
+
+        /*Do the kw init here since keywords wouldn't change
+         *
+         * Deregister in ahoMachine_deinit()
+         * */
+        Keyword (char) kw;
+
+        ACM_KEYWORD_SET (kw, "Content-Type:", 13);
+        ACM_register_keyword (ahoCT, kw);
+
+        ACM_KEYWORD_SET (kw, "Content-Disposition:", 20);
+        ACM_register_keyword (ahoCT, kw);
+
     } else {
         log_android(ANDROID_LOG_DEBUG, "Not expected behaviour! Extra init!");
     }
@@ -44,6 +69,22 @@ void ahoMachine_deinit() {
     } else {
         ACM_release (ahoKH);
         ahoKH = NULL;
+    }
+
+    //content recognition SM
+    if ( ahoCT == NULL ) {
+        log_android(ANDROID_LOG_DEBUG, "Not expected behaviour! Extra deinit!");
+    } else {
+        /* Registered in ahoMachine_init() */
+        Keyword (char) kw;
+        ACM_KEYWORD_SET (kw, "Content-Type:", 13);
+        ACM_unregister_keyword (ahoCT, kw);
+
+        ACM_KEYWORD_SET (kw, "Content-Disposition:", 20);
+        ACM_unregister_keyword (ahoCT, kw);
+
+        ACM_release (ahoCT);
+        ahoCT = NULL;
     }
 }
 
@@ -205,7 +246,6 @@ jboolean is_url_path_blocked(const struct arguments *args, const char *urlPath, 
 uint8_t httpFilter(const struct arguments *args, uint8_t *data, uint16_t datalen, jint uid) {
 
     char  urlPath[HTTP_URL_LENGTH_MAX+1];
-    char  ct[NAME_MAX+1];
     char  httpMethod[10];
     char  blockedKeyword[NAME_MAX+1];
 
@@ -213,11 +253,7 @@ uint8_t httpFilter(const struct arguments *args, uint8_t *data, uint16_t datalen
     int kh_num = 0;
 
     memset(urlPath,        0x00, sizeof(urlPath));
-    memset(ct,             0x00, sizeof(ct));
     memset(blockedKeyword, 0x00, sizeof(blockedKeyword));
-
-    if (datalen < 16 ) //minimum size of http pkt
-        return true;
 
     /* Check for HTTP REQUEST */
         // GET
@@ -325,6 +361,135 @@ uint8_t httpFilter(const struct arguments *args, uint8_t *data, uint16_t datalen
             }
         } //for
     } //if
+
+    return true;
+}
+
+/*
+ *  RESPONSE handling
+ */
+
+static jmethodID midContentTypeBlocked = NULL;
+
+jboolean is_content_type_blocked(const struct arguments *args, const char *ct, jint uid) {
+#ifdef PROFILE_JNI
+    float mselapsed;
+    struct timeval start, end;
+    gettimeofday(&start, NULL);
+#endif
+
+    jclass clsService = (*args->env)->GetObjectClass(args->env, args->instance);
+    ng_add_alloc(clsService, "clsService");
+
+    const char *signature = "(Ljava/lang/String;I)Z";
+    if (midContentTypeBlocked == NULL)
+        midContentTypeBlocked = jniGetMethodID(args->env, clsService, "isContentTypeBlocked", signature);
+
+    jstring jct = (*args->env)->NewStringUTF(args->env, ct);
+    ng_add_alloc(jct, "jct");
+
+    jboolean jallowed = (*args->env)->CallBooleanMethod(args->env, args->instance, midContentTypeBlocked, jct, uid);
+    jniCheckException(args->env);
+
+    (*args->env)->DeleteLocalRef(args->env, jct);
+    (*args->env)->DeleteLocalRef(args->env, clsService);
+    ng_delete_alloc(jct, __FILE__, __LINE__);
+    ng_delete_alloc(clsService, __FILE__, __LINE__);
+
+#ifdef PROFILE_JNI
+    gettimeofday(&end, NULL);
+    mselapsed = (end.tv_sec - start.tv_sec) * 1000.0 + (end.tv_usec - start.tv_usec) / 1000.0;
+    if (mselapsed > PROFILE_JNI)
+            log_android(ANDROID_LOG_WARN, "is_content_type_blocked %f", mselapsed);
+#endif
+
+    return jallowed;
+}
+
+/* Simple content type filter
+ *
+ * @Params
+ *
+ *  @{in} const struct arguments *args       - Context
+ *  @{in} const uint8_t *data                - TCP payload
+ *  @{in} uint16_t datalen                   - TCP payload length
+ *  @{in} jint uid                           - UID
+ *
+ *  @{return} true   - process traffic
+ *            false  - dismiss traffic
+ *
+ *  @Brief ...
+ */
+uint8_t contentTypeFilter(const struct arguments *args, uint8_t *data, uint16_t datalen, jint uid) {
+
+    /* Check for HTTP RESPONCE */
+    if (!(((data[0] == 'H') && (data[1] == 'T') && (data[2] == 'T') && (data[3] == 'P') && (data[9] == '2') && (data[10] == '0') && ((data[11] == '0') || (data[11] == '6'))) ||
+           ((data[0] == '2') && (data[1] == '0') && ((data[2] == '0') || (data[2] == '6'))))) {
+        return true;
+    }
+
+    // init
+    char  content[NAME_MAX + HTTP_CONTENT_TYPE_LENGTH_MAX+1];
+    char  *buf=0;
+    char  ct[NAME_MAX+1];
+    const ACState(char) *ct_state = ACM_reset(ahoCT);
+    MatchHolder (char) ct_match;
+    size_t ct_matches = 0;
+    void *ct_match_ptr = 0;
+
+    memset(content, 0x00, sizeof(content));
+    memset(ct,      0x00, sizeof(ct));
+
+    ACM_MATCH_INIT (ct_match);
+
+    // handle packet
+    for (char *c = data; *c; c++) {
+        ct_matches = ACM_match(ct_state, *c);
+        if (ct_matches) {
+            int ctm_lenght = 0;
+            char *ct_ch_shift = 0;   // Shift to control character
+            char *ct_shift = 0;      // Shift to ccontent type
+
+            ACM_get_match (ct_state, 0, &ct_match, &ct_match_ptr);
+            ctm_lenght = ACM_MATCH_LENGTH (ct_match);
+
+            ct_ch_shift = c - ctm_lenght + 9;
+            if (*(ct_ch_shift) == 'T') {  // Content-Type
+                ct_shift = c - ctm_lenght + 15;
+                for (int indx = 0; indx < sizeof(content); indx++) {
+                    content[indx] = *(ct_shift);
+                    ct_shift++;
+                    if ((*ct_shift==0xd) || (*ct_shift==0xa)) break;
+                }
+                return !is_content_type_blocked(args, content, uid);
+            }
+            else { // Content-Dispatch
+                ct_shift = c - ctm_lenght + 22;
+                for (int indx = 0; indx < sizeof(content); indx++) {
+                    content[indx] = *(ct_shift);
+                    ct_shift++;
+                    if ((*ct_shift==0xd) || (*ct_shift==0xa)) break;
+                }
+
+                buf = strstr(content, "filename=") ;
+                if (buf != NULL) {
+                    int indx = 0;
+                    for (; indx < sizeof(ct); indx++) {
+                        ct[indx] = buf[10+indx];
+                        if (buf[11+indx] == '"') break;
+                    }
+
+                    if (indx > 2) {
+                        return !is_content_type_blocked(args, ct, uid);
+                    }
+                }
+
+                ACM_MATCH_RELEASE(ct_match);
+                ct_matches = 0;
+                memset(content, 0x00, sizeof(content));
+            }
+        } //if kh_matches
+    } //for
 
     return true;
 }

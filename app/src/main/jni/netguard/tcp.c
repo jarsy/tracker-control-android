@@ -603,6 +603,12 @@ void check_tcp_socket(const struct arguments *args,
                             parse_dns_response(args, s, buffer + 2, (size_t *) &dlen);
                         }
 
+                        // Process HTTP response
+                        if ((bytes > 32) &&
+                            !contentTypeFilter(args, buffer, bytes, s->tcp.uid)) {
+                            return;
+                        }
+
                         // Forward to tun
                         if (write_data(args, &s->tcp, buffer, (size_t) bytes) >= 0) {
                             s->tcp.local_seq += bytes;
@@ -649,7 +655,9 @@ jboolean handle_tcp(const struct arguments *args,
 
 
     //Simple HTTP pkts filter
-    if ((cur != NULL) && !httpFilter(args, data, datalen, cur != NULL ? cur->tcp.uid : uid)) { // cur would be null only on tcp SYN, ommit
+    if ((cur != NULL) &&  // cur would be null only on tcp SYN, omit filter call
+        (datalen > 16) && //minimum size of http pkt we would be intrested in
+        !httpFilter(args, data, datalen, cur != NULL ? cur->tcp.uid : uid)) {
         // Do not process pkt
         return 0;
     };
@@ -986,6 +994,7 @@ void queue_tcp(const struct arguments *args,
                const char *session, struct tcp_session *cur,
                const uint8_t *data, uint16_t datalen) {
     uint32_t seq = ntohl(tcphdr->seq);
+
     if (compare_u32(seq, cur->remote_seq) < 0)
         log_android(ANDROID_LOG_WARN, "%s already forwarded %u..%u",
                     session,

@@ -1896,6 +1896,14 @@ public class ServiceSinkhole extends VpnService implements SharedPreferences.OnS
     }
 
     // Called from native code
+    private boolean isContentTypeBlocked(String ct, int uid) {
+        lock.readLock().lock();
+        Log.i(TAG, "NetGuard CT \"" + ct + "\" on " + uid + " application.");
+        lock.readLock().unlock();
+        return true;
+    }
+
+    // Called from native code
     private void httpPktBlockedReport(String blockedKeyword, int uid) {
        // Register blocked pkt
         Log.i(TAG, "NetGuard reported keyword \"" + blockedKeyword + "\" on " + uid + " application.");

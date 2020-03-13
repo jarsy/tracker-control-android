@@ -41,6 +41,7 @@
     void dnsResolved(eu.faircode.netguard.ResourceRecord);
     boolean isDomainBlocked(java.lang.String);
     boolean isURLPathBlocked(java.lang.String, int);
+    boolean isContentTypeBlocked(java.lang.String, int);
     void httpPktBlockedReport(java.lang.String, int);
     void httpPktKeywordHashedReport(java.lang.String, int);
     int getUidQ(int, int, java.lang.String, int, java.lang.String, int);
